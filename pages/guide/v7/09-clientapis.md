@@ -37,11 +37,47 @@ All Elide APIs share a common set of concepts:
 
 ### API Versioning
 
-Elide allows multiple versions of the same models to coexist and for clients to request a particular instance.  Elide JAX-RS endpoints (elide-standalone) and Spring conrollers (Spring) support an API version header ('ApiVersion') that can be set to match the model annotation (`@ApiVersion`) version.
+Elide allows multiple versions of the same models to coexist and for clients to request a particular instance.  Elide JAX-RS endpoints (elide-standalone) and Spring controllers (Spring) support an API version that can be set to match the model annotation (`@ApiVersion`) version.
 
 If no version is specified by the client, Elide only exposes the models that lack an `@ApiVersion` annotation.
 
 OpenAPI endpoints (JSON-API) and GraphQL schemas are also scoped by the `ApiVersion` header.  They only return the schema corresponding to the requested API version.  
+
+Elide includes implementations for the following API Versioning Strategies
+- Path
+- Header
+- Parameters
+- Media Type Profile
+
+This can be customized by implementing and registering a `com.yahoo.elide.core.request.route.RouteResolver`.
+
+The default in Elide Spring Boot uses the Path strategy. The Path strategy is the only one that is supported when integrating with Springdoc as the other strategies are difficult to document with OpenAPI.
+
+This can be configured using `application.yaml`.
+
+```yaml
+elide:
+  api-versioning-strategy:
+    path:
+      enabled: false
+    header:
+      enabled: true
+      header-name:
+      - ApiVersion
+```
+
+The default in Elide Standalone now accepts all the strategies.
+
+This can be configured by overriding `ElideStandaloneSettings`.
+
+```java
+public abstract class Settings implements ElideStandaloneSettings {
+    @Override
+    public RouteResolver getRouteResolver() {
+        new HeaderRouteResolver("ApiVersion");
+    }
+}
+```
 
 Details of how to version Elide models can be found [here]({{site.baseurl}}/pages/guide/v{{ page.version }}/02-data-model.html#api-versions).  Details of how to configure versioned OpenAPI documents can be found [here]({{site.baseurl}}/pages/guide/v{{ page.version }}/13-openapi.html#api-versions).
 
@@ -104,19 +140,18 @@ Elide has built-in support for either:
 
 ##### Spring Boot Configuration
 
-[Elide Spring Boot][elide-spring] is configured by default to use IS08601 dates.
+[Elide Spring Boot][elide-spring] is configured by default to use ISO8601 dates.
 
-This can be toggled by overriding the `Elide` autoconfigure bean:
+This can be toggled by creating a `ElideSettingsBuilderCustomizer` bean:
 
 ```java
+@Configuration
+public class ElideConfiguration {
     @Bean
-    public Elide initializeElide(EntityDictionary dictionary, DataStore dataStore, ElideConfigProperties settings) {
-
-        ElideSettingsBuilder builder = new ElideSettingsBuilder(dataStore)
-                ...
-                .withEpochDates();
-
-        return new Elide(builder.build());
+    ElideSettingsBuilderCustomizer elideSettingsBuilderCustomizer() {
+        return builder -> builder.serdes(serdes -> serdes.withEpochDates());
+    }
+}
 ```
 
 ##### Elide Standalone Configuration
@@ -124,13 +159,15 @@ This can be toggled by overriding the `Elide` autoconfigure bean:
 [Elide Standalone][elide-standalone] defaults to ISO8601 dates.  This can be toggled by overriding the following setting in `ElideStandaloneSettings`:
 
 ```java
+public abstract class Settings implements ElideStandaloneSettings {
     /**
      * Whether Dates should be ISO8601 strings (true) or epochs (false).
      * @return
      */
-    default boolean enableIS06081Dates() {
+    public boolean enableIS06081Dates() {
         return true;
     }
+}
 ```
 
 ##### Elide Library Configuration
