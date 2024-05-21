@@ -392,3 +392,25 @@ Type coercion between the API and underlying data model has common support acros
 --------------------------
 
 Configuring custom error responses is documented [here]({{site.baseurl}}/pages/guide/v{{ page.version }}/09-clientapis.html#custom-error-responses).
+
+## Customizing Field Definition Description
+--------------------------
+
+The `GraphQLFieldDefinition` can be customized by setting a `GraphQLFieldDefinitionCustomizer` to the `GraphQLSettingsBuilder`.
+
+```java
+@Configuration
+public class ElideConfiguration {
+  @Bean
+  GraphQLSettingsBuilderCustomizer graphqlSettingsBuilderCustomizer() {
+    return graphqlSettings -> graphqlSettings.graphqlFieldDefinitionCustomizer(
+       ((fieldDefinition, parentClass, attributeClass, attribute, fetcher, entityDictionary) -> {
+          Description description = entityDictionary.getAttributeOrRelationAnnotation(parentClass,
+              Description.class, attribute);
+          if (description != null) {
+            fieldDefinition.description(description.value());
+          }
+        }));
+  }
+}
+```
